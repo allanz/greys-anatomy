@@ -75,6 +75,7 @@ class TimeFragment {
 @Cmd(name = "tt", sort = 5, summary = "TimeTunnel the method call.",
         eg = {
                 "tt -t *StringUtils isEmpty",
+                "tt -t -n 10  *StringUtils isEmpty",
                 "tt -l",
                 "tt -D",
                 "tt -i 1000 -w params[0]",
@@ -114,6 +115,10 @@ public class TimeTunnelCommand implements Command {
     // expend of TimeTunnel
     @NamedArg(name = "x", hasValue = true, summary = "expend level of object. Default level-0")
     private Integer expend;
+    
+    // times of TimeTunnel record
+    @NamedArg(name = "n", hasValue = true, summary = "record count of the method call")
+    private Integer count;
 
     // watch the index TimeTunnel
     @NamedArg(name = "w",
@@ -258,7 +263,7 @@ public class TimeTunnelCommand implements Command {
 
         return new GetEnhancerAction() {
             @Override
-            public GetEnhancer action(Session session, Instrumentation inst, final Sender sender) throws Throwable {
+            public GetEnhancer action(final Session session, Instrumentation inst, final Sender sender) throws Throwable {
                 return new GetEnhancer() {
                     @Override
                     public Matcher getClassNameMatcher() {
@@ -275,6 +280,10 @@ public class TimeTunnelCommand implements Command {
                         return isIncludeSub;
                     }
 
+					public int getEnhanceTimes() {
+						return count;
+					}
+					
                     @Override
                     public AdviceListener getAdviceListener() {
 
@@ -284,6 +293,11 @@ public class TimeTunnelCommand implements Command {
                              * 第一次启动标记
                              */
                             volatile boolean isFirst = true;
+                            
+                            /*
+                             * 调用次数
+                             */
+                            volatile int callIndex;
 
                             /*
                              * 方法执行时间戳
@@ -364,10 +378,18 @@ public class TimeTunnelCommand implements Command {
                                 fillTableRow(view, index, timeTunnel);
 
                                 sender.send(false, view.draw());
+                                
+                                this.callIndex ++;
+
+                                //已经达到调用次数限制，结束
+                                if(this.callIndex >= getEnhanceTimes()){
+                                	session.unLock();
+                                }
                             }
 
                         };
                     }
+
                 };
             }
         };
